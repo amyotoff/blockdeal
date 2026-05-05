@@ -1,0 +1,6 @@
+{
+  "name": "Contracta",
+  "description": "MVP приложения для совместного редактирования договоренностей и их фиксации с помощью хэша в блокчейне (через MetaMask).",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
