@@ -3,10 +3,30 @@ import { createServer as createViteServer } from 'vite';
 import { createServer as createHttpServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
+import {
+  joinRoom,
+  setRoomTxHash,
+  toggleParticipantSign,
+  updateParticipantName,
+  updateRoomText,
+} from './server/rooms';
+import { SqliteRoomRepository } from './server/storage/sqliteRoomRepository';
+import type { RoomRepository } from './server/storage/roomRepository';
 
-async function startServer() {
+interface BlockDealServerOptions {
+  port?: number;
+  host?: string;
+  useVite?: boolean;
+  databasePath?: string;
+  roomRepository?: RoomRepository;
+}
+
+export async function createBlockDealServer(options: BlockDealServerOptions = {}) {
+  // One Node process serves both the HTTP app and realtime Socket.IO events.
   const app = express();
-  const PORT = 3000;
+  const port = options.port ?? 3000;
+  const host = options.host ?? '0.0.0.0';
+  const useVite = options.useVite ?? process.env.NODE_ENV !== 'production';
   
   const httpServer = createHttpServer(app);
   const io = new Server(httpServer, {
@@ -15,96 +35,73 @@ async function startServer() {
     }
   });
 
-  // Simple in-memory state for rooms
-  // room_id -> { text: string, participants: { id: string, name: string, signed: boolean }[], hashed: boolean, txHash: string }
-  const rooms = new Map();
+  // KISS persistence: one repository keeps room state durable without leaking DB details
+  // into the realtime event handlers.
+  const roomRepository = options.roomRepository ?? new SqliteRoomRepository(options.databasePath);
 
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
     socket.on('join_room', (roomId, userName) => {
+      // Socket.IO rooms let us broadcast updates only to participants of this contract.
       socket.join(roomId);
       
-      if (!rooms.has(roomId)) {
-        rooms.set(roomId, {
-          text: 'Договор купли-продажи\n\nМодель R2-D2 (далее "Покупатель") и Сгибальщик Сгибающий Родригес, он же Бендер (далее "Продавец"), заключили настоящий договор о нижеследующем:\n\n1. Продавец обязуется передать в собственность Покупателю, а Покупатель обязуется принять и оплатить атомный аккумулятор емкостью 10 000 МВт·ч для домашних нужд.\n2. Товар должен быть доставлен в исправном состоянии, без следов взлома, кражи или воздействия алкоголя.\n3. В случае нарушения сроков поставки Продавец обязуется выплатить неустойку в размере 10 криптокредитов за каждый оборот вокруг Солнца, но оставляет за собой право потребовать от Покупателя блестящий зад.',
-          participants: [],
-          hashed: false,
-          txHash: ''
-        });
-      }
+      // Lazily create a contract room the first time a shared room link is opened.
+      const room = roomRepository.getOrCreateRoom(roomId);
       
-      const room = rooms.get(roomId);
-      
-      // Add or update participant
-      const existing = room.participants.find(p => p.id === socket.id);
-      if (!existing) {
-        room.participants.push({ id: socket.id, name: userName || 'Аноним', signed: false });
-      }
+      // One browser socket maps to one current participant in the room.
+      joinRoom(room, socket.id, userName);
+      roomRepository.saveRoom(roomId, room);
 
       io.to(roomId).emit('room_state', room);
     });
 
     socket.on('update_text', (roomId, newText) => {
-      const room = rooms.get(roomId);
-      if (room && !room.hashed) {
-        room.text = newText;
-        // Broadcast to everyone else in the room
+      const room = roomRepository.getRoom(roomId);
+      if (room && updateRoomText(room, newText)) {
+        roomRepository.saveRoom(roomId, room);
+        // Before lock, text sync is intentionally simple last-write-wins realtime sync.
         socket.to(roomId).emit('text_updated', newText);
       }
     });
 
     socket.on('update_name', (roomId, newName) => {
-      const room = rooms.get(roomId);
-      if (room) {
-        const p = room.participants.find(p => p.id === socket.id);
-        if (p) {
-          p.name = newName;
-          io.to(roomId).emit('room_state', room);
-        }
+      const room = roomRepository.getRoom(roomId);
+      if (room && updateParticipantName(room, socket.id, newName)) {
+        roomRepository.saveRoom(roomId, room);
+        io.to(roomId).emit('room_state', room);
       }
     });
 
     socket.on('toggle_sign', (roomId) => {
-      const room = rooms.get(roomId);
-      if (room && !room.hashed) {
-        const p = room.participants.find(p => p.id === socket.id);
-        if (p) {
-          p.signed = !p.signed;
-          
-          // Check if everyone signed
-          const allSigned = room.participants.length > 1 && room.participants.every(part => part.signed);
-          if (allSigned) {
-            room.hashed = true;
-          }
-          
-          io.to(roomId).emit('room_state', room);
-        }
+      const room = roomRepository.getRoom(roomId);
+      if (room && toggleParticipantSign(room, socket.id)) {
+        roomRepository.saveRoom(roomId, room);
+        io.to(roomId).emit('room_state', room);
       }
     });
 
     socket.on('set_tx_hash', (roomId, txHash) => {
-      const room = rooms.get(roomId);
+      const room = roomRepository.getRoom(roomId);
       if (room) {
-        room.txHash = txHash;
+        // The client sends the blockchain transaction hash after wallet submission.
+        setRoomTxHash(room, txHash);
+        roomRepository.saveRoom(roomId, room);
         io.to(roomId).emit('room_state', room);
       }
     });
 
     socket.on('disconnect', () => {
-      // Find which room they were in and remove them
-      rooms.forEach((room, roomId) => {
-        const initialCount = room.participants.length;
-        room.participants = room.participants.filter(p => p.id !== socket.id);
-        if (room.participants.length !== initialCount) {
-          io.to(roomId).emit('room_state', room);
-        }
+      // A disconnected socket no longer counts as an active participant.
+      roomRepository.removeParticipant(socket.id).forEach((roomId) => {
+        io.to(roomId).emit('room_state', roomRepository.getRoom(roomId));
       });
     });
   });
 
-  // Vite middleware setup
-  if (process.env.NODE_ENV !== "production") {
+  // In development, Vite handles frontend files through middleware.
+  // In production, the same Node server serves the built static app.
+  if (useVite) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -118,9 +115,41 @@ async function startServer() {
     });
   }
 
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  return {
+    app,
+    httpServer,
+    io,
+    roomRepository,
+    listen: () => new Promise<void>((resolve) => {
+      httpServer.listen(port, host, () => {
+        const address = httpServer.address();
+        const actualPort = typeof address === 'object' && address ? address.port : port;
+        console.log(`Server running on http://localhost:${actualPort}`);
+        resolve();
+      });
+    }),
+    close: () => new Promise<void>((resolve, reject) => {
+      io.close();
+      httpServer.close((error) => {
+        roomRepository.close();
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    }),
+  };
 }
 
-startServer();
+async function startServer() {
+  const server = await createBlockDealServer();
+  await server.listen();
+}
+
+if (process.env.NODE_ENV !== 'test') {
+  startServer().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
