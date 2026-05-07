@@ -72,7 +72,7 @@ describe('SqliteRoomRepository CRUD', () => {
 
     expect(repository.deleteRoom('room-delete')).toBe(true);
     expect(repository.getRoom('room-delete')).toBeNull();
-    expect(repository.removeParticipant('socket-1')).toEqual([]);
+    expect(repository.removeParticipantFromDraftRooms('socket-1')).toEqual([]);
 
     repository.close();
   });
@@ -88,9 +88,28 @@ describe('SqliteRoomRepository CRUD', () => {
     repository.saveRoom('room-a', roomA);
     repository.saveRoom('room-b', roomB);
 
-    expect(repository.removeParticipant('socket-1')).toEqual(['room-a', 'room-b']);
+    expect(repository.removeParticipantFromDraftRooms('socket-1')).toEqual(['room-a', 'room-b']);
     expect(repository.getRoom('room-a')!.participants).toEqual([]);
     expect(repository.getRoom('room-b')!.participants).toEqual([{ id: 'socket-2', name: 'Bob', signed: false }]);
+
+    repository.close();
+  });
+
+  it('keeps finalized signer sets intact on disconnect cleanup', () => {
+    const repository = new SqliteRoomRepository(':memory:');
+    const room = repository.getOrCreateRoom('room-locked');
+
+    joinRoom(room, 'socket-1', 'Alice');
+    joinRoom(room, 'socket-2', 'Bob');
+    toggleParticipantSign(room, 'socket-1');
+    toggleParticipantSign(room, 'socket-2');
+    repository.saveRoom('room-locked', room);
+
+    expect(repository.removeParticipantFromDraftRooms('socket-1')).toEqual([]);
+    expect(repository.getRoom('room-locked')!.participants).toEqual([
+      { id: 'socket-1', name: 'Alice', signed: true },
+      { id: 'socket-2', name: 'Bob', signed: true },
+    ]);
 
     repository.close();
   });

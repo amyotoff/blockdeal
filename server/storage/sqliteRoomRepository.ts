@@ -101,15 +101,29 @@ export class SqliteRoomRepository implements RoomRepository {
     return result.changes > 0;
   }
 
-  removeParticipant(socketId: string): string[] {
+  removeParticipantFromDraftRooms(socketId: string): string[] {
     const roomIds = this.db
-      .prepare<[string], { room_id: string }>('SELECT room_id FROM participants WHERE id = ? ORDER BY room_id')
+      .prepare<[string], { room_id: string }>(`
+        SELECT participants.room_id
+        FROM participants
+        INNER JOIN rooms ON rooms.id = participants.room_id
+        WHERE participants.id = ? AND rooms.hashed = 0
+        ORDER BY participants.room_id
+      `)
       .all(socketId)
       .map((row) => row.room_id);
 
     if (roomIds.length === 0) return [];
 
-    this.db.prepare<[string]>('DELETE FROM participants WHERE id = ?').run(socketId);
+    const removeParticipant = this.db.prepare<[string, string]>(`
+      DELETE FROM participants
+      WHERE id = ? AND room_id = ?
+    `);
+
+    roomIds.forEach((roomId) => {
+      removeParticipant.run(socketId, roomId);
+    });
+
     return roomIds;
   }
 

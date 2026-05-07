@@ -38,6 +38,10 @@ function connectClient(url: string): Socket {
   return socket;
 }
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 afterEach(async () => {
   clients.forEach((client) => client.disconnect());
   clients = [];
@@ -48,7 +52,7 @@ afterEach(async () => {
 });
 
 describe('Socket.IO room flow', () => {
-  it('syncs room joins, text edits, signing lock, tx hash, and disconnects', async () => {
+  it('keeps the finalized signer set stable across disconnects and late viewers', async () => {
     const url = await startTestServer();
     const alice = connectClient(url);
     const bob = connectClient(url);
@@ -85,8 +89,49 @@ describe('Socket.IO room flow', () => {
     alice.emit('set_tx_hash', roomId, '0xabc');
     expect((await txState).txHash).toBe('0xabc');
 
+    alice.disconnect();
+    await wait(25);
+    expect(server!.roomRepository.getRoom(roomId)!.participants).toEqual([
+      { id: expect.any(String), name: 'Alice', signed: true },
+      { id: expect.any(String), name: 'Bob', signed: true },
+    ]);
+
+    const charlie = connectClient(url);
+    const charlieState = once<RoomState>(charlie, 'room_state');
+    charlie.emit('join_room', roomId, 'Charlie');
+    expect(await charlieState).toEqual({
+      text: 'Updated agreement',
+      participants: [
+        { id: expect.any(String), name: 'Alice', signed: true },
+        { id: expect.any(String), name: 'Bob', signed: true },
+      ],
+      hashed: true,
+      txHash: '0xabc',
+    });
+    expect(server!.roomRepository.getRoom(roomId)!.participants).toHaveLength(2);
+  });
+
+  it('still removes disconnected participants from draft rooms', async () => {
+    const url = await startTestServer();
+    const alice = connectClient(url);
+    const bob = connectClient(url);
+    const roomId = 'draft-room';
+
+    const aliceJoined = once<RoomState>(alice, 'room_state', (room) => room.participants.length === 1);
+    alice.emit('join_room', roomId, 'Alice');
+    await aliceJoined;
+
+    const bothJoined = once<RoomState>(bob, 'room_state', (room) => room.participants.length === 2);
+    bob.emit('join_room', roomId, 'Bob');
+    await bothJoined;
+
     const bobSeesDisconnect = once<RoomState>(bob, 'room_state', (room) => room.participants.length === 1);
     alice.disconnect();
-    expect((await bobSeesDisconnect).participants[0].name).toBe('Bob');
+    expect((await bobSeesDisconnect).participants).toEqual([
+      { id: expect.any(String), name: 'Bob', signed: false },
+    ]);
+    expect(server!.roomRepository.getRoom(roomId)!.participants).toEqual([
+      { id: expect.any(String), name: 'Bob', signed: false },
+    ]);
   });
 });

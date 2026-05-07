@@ -6,6 +6,6 @@ export interface RoomRepository {
   getOrCreateRoom(roomId: string): RoomState;
   saveRoom(roomId: string, room: RoomState): void;
   deleteRoom(roomId: string): boolean;
-  removeParticipant(socketId: string): string[];
+  removeParticipantFromDraftRooms(socketId: string): string[];
   close(): void;
 }

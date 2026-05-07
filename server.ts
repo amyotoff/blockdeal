@@ -48,7 +48,14 @@ export async function createBlockDealServer(options: BlockDealServerOptions = {}
       
       // Lazily create a contract room the first time a shared room link is opened.
       const room = roomRepository.getOrCreateRoom(roomId);
-      
+
+      if (room.hashed) {
+        // Once finalized, the signer set is part of the durable hash payload.
+        // Late viewers can subscribe to updates, but they must not mutate the room.
+        socket.emit('room_state', room);
+        return;
+      }
+
       // One browser socket maps to one current participant in the room.
       joinRoom(room, socket.id, userName);
       roomRepository.saveRoom(roomId, room);
@@ -92,8 +99,8 @@ export async function createBlockDealServer(options: BlockDealServerOptions = {}
     });
 
     socket.on('disconnect', () => {
-      // A disconnected socket no longer counts as an active participant.
-      roomRepository.removeParticipant(socket.id).forEach((roomId) => {
+      // Draft rooms treat participants as presence. Finalized rooms keep signers durable.
+      roomRepository.removeParticipantFromDraftRooms(socket.id).forEach((roomId) => {
         io.to(roomId).emit('room_state', roomRepository.getRoom(roomId));
       });
     });
