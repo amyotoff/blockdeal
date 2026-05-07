@@ -2,25 +2,14 @@ import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { ethers } from 'ethers';
 import { FileSignature, Copy, CheckCircle2, Lock, ExternalLink, RefreshCw, Send, Users, Shield, Network, Download, FileText } from 'lucide-react';
+import { computeHashPayload, getContractHash } from './lib/contractHash';
+import type { RoomState } from './types/room';
 
 declare global {
   interface Window {
     Telegram?: any;
     ethereum?: any;
   }
-}
-
-interface Participant {
-  id: string;
-  name: string;
-  signed: boolean;
-}
-
-interface RoomState {
-  text: string;
-  participants: Participant[];
-  hashed: boolean;
-  txHash: string;
 }
 
 const SOCKET_URL = window.location.origin;
@@ -115,16 +104,14 @@ export default function App() {
     }
   };
 
-  const computeHashPayload = () => {
+  const buildHashPayload = () => {
     if (!room) return '';
-    const sortedParticipants = [...room.participants].sort((a, b) => a.id.localeCompare(b.id));
-    const signersStr = sortedParticipants.map(p => `${p.name} (Signed: ${p.signed})`).join('\n');
-    return `Договоренность:\n${room.text}\n\nПодписанты:\n${signersStr}`;
+    return computeHashPayload(room);
   };
 
   const getHash = () => {
-    const payload = computeHashPayload();
-    return ethers.id(payload);
+    if (!room) return '';
+    return getContractHash(room);
   };
 
   const anchorToBlockchain = async () => {
@@ -311,7 +298,7 @@ export default function App() {
                       <b>Как работает защита?</b> Блокчейн фиксирует только хэш (цифровой слепок текста). Чтобы в будущем доказать условия договора, вам потребуется <b>исходный файл</b>. Его хэш всегда будет в точности совпадать с записью в Сети.
                     </p>
                     <button onClick={() => {
-                        const payload = computeHashPayload();
+                        const payload = buildHashPayload();
                         const blob = new Blob([payload], { type: 'text/plain;charset=utf-8' });
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
@@ -367,7 +354,7 @@ export default function App() {
           ) : (
             <button
               onClick={() => {
-                const payload = computeHashPayload();
+                const payload = buildHashPayload();
                 const blob = new Blob([payload], { type: 'text/plain;charset=utf-8' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
