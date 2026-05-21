@@ -1,7 +1,26 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { ethers } from 'ethers';
-import { FileSignature, Copy, CheckCircle2, Lock, ExternalLink, RefreshCw, Send, Users, Shield, Network, Download, FileText } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Copy,
+  Download,
+  ExternalLink,
+  FileCheck,
+  FileText,
+  Fingerprint,
+  Handshake,
+  Network,
+  RefreshCw,
+  ReceiptText,
+  Scale,
+  Send,
+  Signature,
+  ScrollText,
+  Terminal,
+  Users,
+} from 'lucide-react';
 import { computeHashPayload, getContractHash } from './lib/contractHash';
 import type { RoomState } from './types/room';
 
@@ -14,7 +33,176 @@ declare global {
 
 const SOCKET_URL = window.location.origin;
 
+function createRoomHash() {
+  const newRoomId = Math.random().toString(36).substring(2, 9);
+  return `#/room/${newRoomId}`;
+}
+
+function LandingPage() {
+  const createRoom = () => {
+    window.location.hash = createRoomHash();
+  };
+
+  return (
+    <div className="min-h-[100dvh] bg-background text-foreground font-sans">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4">
+          <a href="#/landing" className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-white shadow-sm">
+              <Handshake className="h-4 w-4" />
+            </span>
+            <span className="font-heading text-lg font-semibold tracking-tight">BlockDeal</span>
+          </a>
+          <button
+            onClick={createRoom}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition-colors active:bg-surface-muted"
+          >
+            Fix a deal
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section className="mx-auto grid min-h-[calc(100dvh-65px)] w-full max-w-6xl items-center gap-10 px-5 py-12 lg:grid-cols-[1fr_0.95fr]">
+          <div className="max-w-3xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-sm font-medium text-muted shadow-sm">
+              <Scale className="h-4 w-4 text-primary" strokeWidth={1.75} />
+              Both sides agreed. The terms are fixed.
+            </div>
+            <h1 className="font-heading text-5xl font-bold leading-[1.02] tracking-normal text-foreground sm:text-6xl">
+              Agreements fixed. Proof that lasts.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-muted">
+              BlockDeal helps both sides confirm the same terms and create a blockchain-backed receipt without legal theatre or crypto noise.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={createRoom}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(0,180,126,0.18)] transition-colors active:bg-primary-700"
+              >
+                Fix a deal
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              <a
+                href="#proof"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-surface px-6 py-3 text-sm font-bold text-foreground shadow-sm transition-colors active:bg-surface-muted"
+              >
+                See sample receipt
+              </a>
+            </div>
+            <div className="mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
+              {['Same terms for both sides', 'Permanent receipt', 'Export for disputes'].map((item) => (
+                <div key={item} className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm font-medium text-muted">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-surface p-3 shadow-[0_1px_2px_rgba(18,25,31,0.04),0_8px_24px_rgba(18,25,31,0.06)]">
+            <div className="rounded-xl border border-border bg-surface-muted p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="font-heading text-base font-semibold text-foreground">Sample receipt</p>
+                  <p className="text-sm text-muted">Human-readable proof first</p>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+              <FileCheck className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  Receipt ready
+                </span>
+              </div>
+              <div className="space-y-3">
+                <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted">Agreement</span>
+                    <ReceiptText className="h-4 w-4 text-primary" strokeWidth={1.75} />
+                  </div>
+                  <p className="text-sm leading-6 text-foreground">
+                    Delivery milestone triggers payment release. This version cannot be changed after both signatures.
+                  </p>
+                </div>
+                {[
+                  ['Founder', 'Signed', true],
+                  ['Contractor', 'Signed', true],
+                  ['Auditor', 'Waiting', false],
+                ].map(([name, status, signed]) => (
+                  <div key={name as string} className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${
+                          signed ? 'bg-primary-50 text-primary-700' : 'bg-amber-50 text-warning'
+                        }`}
+                      >
+                        {(name as string).substring(0, 2).toUpperCase()}
+                      </span>
+                      <span className="text-sm font-semibold text-foreground">{name as string}</span>
+                    </div>
+                    <span className={signed ? 'text-sm font-semibold text-primary-700' : 'text-sm font-semibold text-warning'}>
+                      {status as string}
+                    </span>
+                  </div>
+                ))}
+                <div className="rounded-xl border border-white/10 bg-secondary p-4 text-white">
+                  <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white/70">
+                    <Fingerprint className="h-3.5 w-3.5 text-accent" strokeWidth={1.75} />
+                    Proof details
+                  </p>
+                  <p className="break-all font-mono text-[11px] leading-5 text-white/75">
+                    0x8f34f7ab90d16665e4c4ab2a531a4be71e89d0f7b3a2c594e9d12e6c1f0a9124
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="proof" className="border-y border-border bg-surface">
+          <div className="mx-auto grid max-w-6xl gap-4 px-5 py-12 md:grid-cols-4">
+            {[
+              ['Draft', 'Write terms in plain language before anything is fixed.', ScrollText],
+              ['Invite', 'Bring the counterparty into the same shared version.', Handshake],
+              ['Sign', 'Each party confirms identity and intent.', Signature],
+              ['Receipt', 'Create a permanent proof users can actually read.', ReceiptText],
+            ].map(([title, body, Icon, color]) => (
+              <article key={title as string} className="rounded-xl border border-border bg-surface p-5 shadow-sm">
+                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-primary/15 bg-primary-50 text-primary-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                  <Icon className="h-6 w-6" strokeWidth={1.55} />
+                </div>
+                <h2 className="font-heading text-lg font-semibold text-foreground">{title as string}</h2>
+                <p className="mt-2 text-sm leading-6 text-muted">{body as string}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="mx-auto grid max-w-6xl gap-6 px-5 py-14 lg:grid-cols-[0.8fr_1.2fr]">
+          <div>
+            <p className="text-sm font-bold text-primary-700">Trust signals</p>
+            <h2 className="mt-2 font-heading text-4xl font-bold text-foreground">Blockchain details appear when proof matters.</h2>
+          </div>
+          <div className="rounded-xl border border-border bg-surface p-5 shadow-[0_1px_2px_rgba(18,25,31,0.04),0_8px_24px_rgba(18,25,31,0.06)]">
+            <div className="mb-4 flex items-center gap-2 text-sm font-bold text-muted">
+              <Terminal className="h-4 w-4 text-primary" strokeWidth={1.75} />
+              Proof model
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {['Human-readable receipt', 'Deterministic checksum', 'EVM transaction reference'].map((item) => (
+                <div key={item} className="rounded-lg border border-border bg-surface-muted px-4 py-4 text-sm font-semibold text-foreground">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
+  const [currentHash, setCurrentHash] = useState<string>(window.location.hash);
   const [roomId, setRoomId] = useState<string>('');
   const [socket, setSocket] = useState<Socket | null>(null);
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -23,23 +211,23 @@ export default function App() {
   const [errorTracker, setErrorTracker] = useState<string>('');
 
   useEffect(() => {
-    const hash = window.location.hash.replace('#/room/', '');
-    if (!window.location.hash.startsWith('#/room/')) {
-      const newRoomId = Math.random().toString(36).substring(2, 9);
-      window.location.hash = `#/room/${newRoomId}`;
-      setRoomId(newRoomId);
-    } else {
-      setRoomId(hash);
-    }
-
     const handleHashChange = () => {
-      const newHash = window.location.hash.replace('#/room/', '');
-      setRoomId(newHash);
+      setCurrentHash(window.location.hash);
     };
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (!currentHash.startsWith('#/room/')) {
+      setRoomId('');
+      setRoom(null);
+      return;
+    }
+
+    setRoomId(currentHash.replace('#/room/', ''));
+  }, [currentHash]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -81,6 +269,10 @@ export default function App() {
       newSocket.disconnect();
     };
   }, [roomId]);
+
+  if (!currentHash.startsWith('#/room/')) {
+    return <LandingPage />;
+  }
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -161,8 +353,8 @@ export default function App() {
 
   if (!room) {
     return (
-      <div className="flex items-center justify-center min-h-[100dvh] bg-slate-50 text-slate-800">
-        <RefreshCw className="animate-spin w-8 h-8 text-indigo-500" />
+      <div className="flex items-center justify-center min-h-[100dvh] bg-background text-foreground">
+        <RefreshCw className="animate-spin w-8 h-8 text-primary" />
       </div>
     );
   }
@@ -172,19 +364,19 @@ export default function App() {
   const totalParticipants = room.participants.length;
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 flex flex-col font-sans text-slate-900 pb-[100px] sm:pb-0">
+    <div className="min-h-[100dvh] bg-background flex flex-col font-sans text-foreground pb-[100px] sm:pb-0">
       
       {/* Small Header for Mobile */}
-      <header className="px-4 py-3 bg-white border-b border-slate-200 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+      <header className="px-4 py-3 bg-background/90 border-b border-border flex items-center justify-between sticky top-0 z-10 shadow-sm backdrop-blur">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-indigo-600 rounded flex items-center justify-center text-white font-bold">
-            <FileSignature className="w-3.5 h-3.5" />
+          <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center text-white font-bold shadow-sm">
+            <Handshake className="w-3.5 h-3.5" strokeWidth={1.75} />
           </div>
-          <span className="font-semibold tracking-tight">LexHash</span>
+          <span className="font-heading font-semibold tracking-tight">BlockDeal</span>
         </div>
         <button 
           onClick={handleCopyLink}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 active:bg-slate-200 transition-colors rounded-lg font-medium text-xs"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-surface text-muted active:bg-surface-muted transition-colors rounded-lg border border-border font-medium text-xs shadow-sm"
         >
           <Copy className="w-3.5 h-3.5" />
           Share ID: {roomId}
@@ -195,16 +387,16 @@ export default function App() {
       <main className="flex-1 p-4 flex flex-col gap-6 max-w-lg mx-auto w-full">
         
         {/* Editor Card */}
-        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col">
-          <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-2xl">
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+        <section className="bg-surface border border-border rounded-xl shadow-[0_1px_2px_rgba(18,25,31,0.04),0_8px_24px_rgba(18,25,31,0.06)] flex flex-col">
+          <div className="px-4 py-3 border-b border-border flex justify-between items-center bg-surface-muted rounded-t-xl">
+            <h2 className="text-sm font-heading font-bold text-foreground flex items-center gap-2">
               Текст договора
-              {room.hashed && <Lock className="w-3.5 h-3.5 text-slate-500" />}
+              {room.hashed && <FileCheck className="w-3.5 h-3.5 text-primary" strokeWidth={1.75} />}
             </h2>
             {room.hashed ? (
-              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 font-bold uppercase tracking-wider">ЗАФИКСИРОВАНО</span>
+              <span className="text-[10px] text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full border border-primary/20 font-bold uppercase tracking-wider">ЗАФИКСИРОВАНО</span>
             ) : (
-              <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-bold uppercase tracking-wider">ЧЕРНОВИК</span>
+              <span className="text-[10px] text-muted bg-surface px-2 py-0.5 rounded-full border border-border font-bold uppercase tracking-wider">ЧЕРНОВИК</span>
             )}
           </div>
           <div className="p-4">
@@ -212,20 +404,20 @@ export default function App() {
               value={room.text}
               onChange={handleTextChange}
               disabled={room.hashed}
-              className="w-full h-[25vh] min-h-[150px] bg-transparent border-none focus:ring-0 resize-none outline-none disabled:text-slate-600 transition-all font-sans text-slate-700 leading-relaxed text-sm selection:bg-indigo-100 p-0"
+              className="w-full h-[25vh] min-h-[150px] bg-transparent border-none focus:ring-0 resize-none outline-none disabled:text-muted transition-all font-sans text-foreground leading-relaxed text-sm selection:bg-primary-100 p-0 placeholder:text-muted/70"
               placeholder="Внесите детали вашей договоренности..."
             />
           </div>
         </section>
 
         {/* Participants Card */}
-        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 flex flex-col gap-3">
+        <section className="bg-surface border border-border rounded-xl shadow-[0_1px_2px_rgba(18,25,31,0.04),0_8px_24px_rgba(18,25,31,0.06)] p-4 flex flex-col gap-3">
           <div className="flex justify-between items-center mb-1">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5" strokeWidth={1.75} />
               Участники ({totalParticipants})
             </h2>
-            <span className="text-[10px] font-medium text-slate-500">
+            <span className="text-[10px] font-medium text-muted">
               {totalSigned} / {totalParticipants} подписали
             </span>
           </div>
@@ -237,7 +429,7 @@ export default function App() {
                 <div key={p.id}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 w-full">
-                      <div className={`w-8 h-8 rounded-full ${p.signed ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'} flex shrink-0 items-center justify-center font-bold text-xs uppercase transition-colors`}>
+                      <div className={`w-8 h-8 rounded-full ${p.signed ? 'bg-primary-50 text-primary-700 ring-1 ring-primary/20' : 'bg-surface-muted text-muted ring-1 ring-border'} flex shrink-0 items-center justify-center font-bold text-xs uppercase transition-colors`}>
                         {isMe ? 'ВЫ' : p.name.substring(0,2)}
                       </div>
                       <div className="flex-1 min-w-0 pr-2">
@@ -245,28 +437,28 @@ export default function App() {
                           <input 
                             value={myName}
                             onChange={handleNameChange}
-                            className="bg-transparent border-b border-transparent focus:border-indigo-500 outline-none w-full text-sm font-semibold text-slate-900 p-0"
+                            className="bg-transparent border-b border-transparent focus:border-primary outline-none w-full text-sm font-semibold text-foreground p-0 placeholder:text-muted/70"
                             placeholder="Ваше имя"
                           />
                         ) : (
-                          <p className="text-sm font-semibold truncate text-slate-900">
+                          <p className="text-sm font-semibold truncate text-foreground">
                             {p.name}
                           </p>
                         )}
-                        <p className={`text-[11px] italic ${p.signed ? 'text-indigo-600 font-medium' : 'text-slate-500'}`}>
+                        <p className={`text-[11px] italic ${p.signed ? 'text-primary-700 font-medium' : 'text-muted'}`}>
                           {p.signed ? 'Подписано' : 'Ожидает...'}
                         </p>
                       </div>
                     </div>
                     {p.signed ? (
-                      <div className="w-5 h-5 rounded-full bg-emerald-500 flex shrink-0 items-center justify-center shadow-sm">
+                      <div className="w-5 h-5 rounded-full bg-primary flex shrink-0 items-center justify-center shadow-sm">
                         <CheckCircle2 className="w-3 h-3 text-white" />
                       </div>
                     ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-slate-200 shrink-0 opacity-60"></div>
+                      <div className="w-5 h-5 rounded-full border-2 border-border shrink-0 opacity-80"></div>
                     )}
                   </div>
-                  {idx < room.participants.length - 1 && <div className="h-px bg-slate-100 mt-3"></div>}
+                  {idx < room.participants.length - 1 && <div className="h-px bg-border mt-3"></div>}
                 </div>
               );
             })}
@@ -275,26 +467,26 @@ export default function App() {
 
         {/* Blockchain Status / Hash Card */}
         {room.hashed && (
-          <section className="bg-white border border-indigo-100 rounded-2xl shadow-sm p-4 bg-gradient-to-b from-indigo-50/50 to-white">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-3 flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5" />
-              Защита хэшем
+          <section className="bg-secondary border border-secondary/10 rounded-xl shadow-[0_1px_2px_rgba(18,25,31,0.04),0_8px_24px_rgba(18,25,31,0.06)] p-4 text-white">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-white/75 mb-3 flex items-center gap-1.5">
+              <ReceiptText className="w-3.5 h-3.5 text-accent" strokeWidth={1.75} />
+              Proof receipt
             </h2>
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 mb-3">
-              <p className="text-[10px] font-mono break-all leading-tight text-slate-600">
+            <div className="p-3 bg-white/5 rounded-lg border border-white/10 mb-3">
+              <p className="text-[10px] font-mono break-all leading-tight text-white/70">
                 {getHash()}
               </p>
             </div>
             {room.txHash ? (
-               <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-                 <div className="flex items-center gap-2 text-emerald-800 font-bold mb-1 text-xs">
-                   <Network className="w-3.5 h-3.5" /> Зафиксировано в Сети
+               <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                 <div className="flex items-center gap-2 text-primary-100 font-bold mb-1 text-xs">
+                   <Network className="w-3.5 h-3.5" strokeWidth={1.75} /> Зафиксировано в Сети
                  </div>
-                 <a href={`https://sepolia.etherscan.io/tx/${room.txHash}`} target="_blank" rel="noreferrer" className="text-emerald-600 text-[10px] hover:underline flex items-center gap-1 break-all mt-1">
+                 <a href={`https://sepolia.etherscan.io/tx/${room.txHash}`} target="_blank" rel="noreferrer" className="text-primary-100 text-[10px] hover:underline flex items-center gap-1 break-all mt-1">
                    {room.txHash} <ExternalLink className="w-3 h-3 shrink-0" />
                  </a>
-                 <div className="mt-3 pt-3 border-t border-emerald-200/50">
-                    <p className="text-[11px] text-emerald-900/80 mb-3 leading-relaxed">
+                 <div className="mt-3 pt-3 border-t border-white/10">
+                    <p className="text-[11px] text-white/75 mb-3 leading-relaxed">
                       <b>Как работает защита?</b> Блокчейн фиксирует только хэш (цифровой слепок текста). Чтобы в будущем доказать условия договора, вам потребуется <b>исходный файл</b>. Его хэш всегда будет в точности совпадать с записью в Сети.
                     </p>
                     <button onClick={() => {
@@ -304,13 +496,13 @@ export default function App() {
                         link.href = URL.createObjectURL(blob);
                         link.download = `LexHash_${roomId}.txt`;
                         link.click();
-                    }} className="w-full py-2 bg-white text-emerald-700 border border-emerald-200 font-semibold rounded-lg text-xs flex justify-center items-center gap-1.5 active:bg-emerald-50 shadow-sm">
+                    }} className="w-full py-2 bg-white text-secondary border border-white/10 font-semibold rounded-lg text-xs flex justify-center items-center gap-1.5 active:bg-primary-50 shadow-sm">
                       <Download className="w-3.5 h-3.5" /> Скачать оригинал файла (.txt)
                     </button>
                  </div>
                </div>
             ) : (
-              <p className="text-[11px] text-slate-500 leading-relaxed">
+              <p className="text-[11px] text-white/70 leading-relaxed">
                 Документ подписан всеми сторонами. Теперь любой участник может отправить хэш в EVM сеть (Sepolia).
               </p>
             )}
@@ -319,15 +511,15 @@ export default function App() {
       </main>
 
       {/* Sticky Bottom Action Bar for Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)] z-20 pb-safe">
+      <div className="fixed bottom-0 left-0 right-0 bg-background/90 border-t border-border p-4 shadow-[0_-8px_30px_-18px_rgba(18,25,31,0.25)] z-20 pb-safe backdrop-blur">
         <div className="max-w-lg mx-auto">
           {!room.hashed ? (
             <button
               onClick={toggleSign}
               className={`w-full py-3.5 font-bold rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2 ${
                 myParticipant?.signed 
-                  ? 'bg-slate-100 text-slate-500 border border-slate-200 active:bg-slate-200'
-                  : 'bg-indigo-600 active:bg-indigo-700 text-white shadow-indigo-100'
+                  ? 'bg-surface text-muted border border-border active:bg-surface-muted'
+                  : 'bg-primary active:bg-primary-700 text-white shadow-[0_10px_24px_rgba(0,180,126,0.18)]'
               }`}
             >
               {myParticipant?.signed ? 'Отозвать подпись' : (
@@ -339,14 +531,14 @@ export default function App() {
               <button
                 onClick={anchorToBlockchain}
                 disabled={isAnchoring}
-                className="w-full py-3.5 bg-slate-900 active:bg-slate-800 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-200"
+                className="w-full py-3.5 bg-primary active:bg-primary-700 text-white font-bold rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/20 disabled:opacity-70"
               >
-                {isAnchoring ? <RefreshCw className="w-4 h-4 animate-spin text-slate-400" /> : (
+                {isAnchoring ? <RefreshCw className="w-4 h-4 animate-spin text-primary-50" /> : (
                   <>Зафиксировать в блокчейне <ExternalLink className="w-4 h-4 opacity-80" /></>
                 )}
               </button>
               {errorTracker && (
-                <div className="text-[10px] text-red-500 text-center leading-tight">
+                <div className="text-[10px] text-danger text-center leading-tight">
                   {errorTracker}
                 </div>
               )}
@@ -361,7 +553,7 @@ export default function App() {
                 link.download = `LexHash_${roomId}.txt`;
                 link.click();
               }}
-              className="w-full py-3.5 bg-emerald-50 active:bg-emerald-100 text-emerald-700 font-bold rounded-xl text-sm flex items-center justify-center gap-2 border border-emerald-200 transition-colors shadow-sm"
+              className="w-full py-3.5 bg-secondary active:bg-secondary-900 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 border border-secondary/10 transition-colors shadow-sm"
             >
               <FileText className="w-4 h-4" /> Сохранить договор на устройство
             </button>

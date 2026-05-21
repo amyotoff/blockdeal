@@ -54,6 +54,14 @@ Known MVP limitations:
 - Tailwind Vite plugin
 - npm
 
+## Design system
+
+BlockDeal uses the Trust Ledger design system for the app UI, landing pages, and promo materials.
+
+- Source tokens live in `src/index.css`.
+- Implementation guidance lives in [`docs/trust-ledger-design-system.md`](docs/trust-ledger-design-system.md).
+- The visual direction is calm fintech/legal-tech clarity, with `#00B47E` as the primary trust and confirmation color.
+
 Current KISS recommendation:
 
 - Keep React + Vite for the frontend.

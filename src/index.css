@@ -1,1 +1,49 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap");
 @import "tailwindcss";
+
+@theme {
+  --color-background: #f6f8f3;
+  --color-foreground: #12191f;
+  --color-surface: #fffffc;
+  --color-surface-muted: #f1f5ee;
+  --color-primary: #00b47e;
+  --color-primary-50: #e9fbf5;
+  --color-primary-100: #cef6e9;
+  --color-primary-500: #00b47e;
+  --color-primary-700: #007a5a;
+  --color-primary-900: #004d3c;
+  --color-secondary: #20313a;
+  --color-secondary-900: #12191f;
+  --color-accent: #8bcfb8;
+  --color-border: #dce3da;
+  --color-muted: #52605d;
+  --color-warning: #c7831e;
+  --color-danger: #b4463a;
+  --font-sans: "Inter", sans-serif;
+  --font-heading: "Space Grotesk", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --radius-ledger: 0.75rem;
+}
+
+:root {
+  color: #12191f;
+  background: #f6f8f3;
+  font-family: "Inter", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100dvh;
+  background: #f6f8f3;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
